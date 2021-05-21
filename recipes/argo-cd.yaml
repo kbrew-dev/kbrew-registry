@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: kbrew
+app:
+  repository:
+    name: argo
+    url: https://argoproj.github.io/argo-helm
+    type: helm
+  namespace: "argocd"
+  sha256:
+  version: 3.6.2
