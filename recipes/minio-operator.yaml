@@ -1,0 +1,25 @@
+# https://github.com/minio/operator/tree/master/helm/minio-operator
+apiVersion: v1
+kind: kbrew
+app:
+  pre_install:
+  - steps:
+    - |
+      # Prerequisites
+      # https://github.com/minio/operator#prerequisites
+      minK8sVersion="v1.19.0"
+      expected=$(echo $minK8sVersion |  sed 's/v//g' | sed 's/\.//g')
+      k8sVersion=$(kubectl version --short=true --output json | jq -r ".serverVersion.gitVersion" | sed 's/-.*//g' | sed 's/v//g' | sed 's/\.//g')
+      if [ $expected -gt $k8sVersion ]
+      then
+        echo "The cluster does not meet requirements."
+        echo "Kubernetes version v1.19.0 or later required."
+        exit 1
+      fi
+  repository:
+    name: minio-operator
+    url: https://operator.min.io
+    type: helm
+  namespace: "minio-operator"
+  sha256:
+  version: 4.1.0
