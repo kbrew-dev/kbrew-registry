@@ -34,7 +34,10 @@ app:
         - http:
             paths:
             - path: /
+              pathType: Prefix
               backend:
-                serviceName: longhorn-frontend
-                servicePort: 80
+                service:
+                  name: longhorn-frontend
+                  port:
+                    number: 80
       " | kubectl -n longhorn-system create -f -
