@@ -9,6 +9,7 @@ app:
   pre_install:
   - steps:
     - curl -s https://raw.githubusercontent.com/longhorn/longhorn/v1.1.1/scripts/environment_check.sh | bash
+    - kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn-manager/master/deploy/prerequisite/longhorn-iscsi-installation.yaml
   post_install:
   - steps:
     - echo ${USER}:$(echo ${PASSWORD} | openssl passwd -stdin -apr1) >> auth
