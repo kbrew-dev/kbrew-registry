@@ -1,0 +1,54 @@
+# MinIO tenant
+# Description: minio-tenant creates MinIO operator and a minio tenant
+# https://github.com/minio/operator/tree/master/helm/minio-operator
+apiVersion: v1
+kind: kbrew
+app:
+  pre_install:
+  - steps:
+    - |
+      # Prerequisites - The StorageClass must have volumeBindingMode: WaitForFirstConsumer
+      # https://github.com/minio/operator#prerequisites
+      scList=$(kubectl get storageclass -o jsonpath='{.items[?(@.volumeBindingMode=="WaitForFirstConsumer")].metadata.name}')
+      if [ -z "$scList" ]
+      then
+        echo "The cluster does not meet requirements."
+        echo "Atleast 1 StorageClass should have WaitForFirstConsumer volumeBindingMode."
+        exit 1
+      fi
+  - apps:
+    - minio-operator
+  # TODO: Remove once https://github.com/kbrew-dev/kbrew/issues/80 is addressed
+  - steps:
+    - kubectl create namespace minio-tenant
+  repository:
+    name: minio
+    url: https://raw.githubusercontent.com/minio/operator/v4.1.0/examples/tenant-lite.yaml
+    type: raw
+  args:
+    Tenant.minio.spec.pools[0].volumeClaimTemplate.spec.storageClassName: '{{ $storageClass := "default" }}{{ range $index, $sc := (lookup "storage.k8s.io/v1" "StorageClass" "" "").items }}{{ if eq $sc.volumeBindingMode "WaitForFirstConsumer"}}{{ $storageClass = $sc.metadata.name }}{{ end }}{{ end }}{{ $storageClass }}'
+    Tenant.minio.spec.pools[0].volumeClaimTemplate.spec.resources.requests.storage: 10Gi
+  namespace: "minio-tenant"
+  sha256:
+  version: 4.1.0
+  post_install:
+  - steps:
+    - |
+      # Wait for tenant to be ready
+      echo "Waiting for tenant to be ready"
+      retry=0
+      while true;
+      do
+        currentState=$(kubectl get tenant -n minio-tenant minio -o jsonpath='{.status.currentState}')
+        if [ ! -z "${currentState}" ] && [ "${currentState}" = "Initialized" ]; then break; fi
+        if [ "${retry}" = 60 ]; then echo "timed out while waiting for minio tenant to be ready"; exit 1; fi
+        sleep 10
+        retry=$((retry+1))
+      done
+    - |
+      # Print console info
+      echo "NOTE:"
+      echo "Port forward with following command to access minio-tenant console - 'kubectl port-forward svc/minio-console -n minio-tenant 9443:9443'"
+      echo "Console ACCESS_KEY: $(kubectl get secret -n minio-tenant console-secret -o jsonpath='{.data.CONSOLE_ACCESS_KEY}' | base64 -d)"
+      echo "Console SECRET_KEY: $(kubectl get secret -n minio-tenant console-secret -o jsonpath='{.data.CONSOLE_SECRET_KEY}' | base64 -d)"
+
