@@ -1,0 +1,69 @@
+# https://banzaicloud.com/docs/supertubes/kafka-operator/install-kafka-operator/
+# Prerequisites:
+# - Kubernetes 1.18.0+.
+# - A Kubernetes cluster (minimum 6 vCPU and 10 GB RAM).
+# Tested On:
+# - GKE v1.19.10-gke.1700
+apiVersion: v1
+kind: kbrew
+app:
+  repository:
+    name: banzaicloud-kafka
+    url: https://raw.githubusercontent.com/banzaicloud/kafka-operator/v0.17.0/config/samples/simplekafkacluster_ssl.yaml
+    type: raw
+  args:
+    # Workaround to get rid of invalid spec error in operator
+    KafkaCluster.kafka.spec.monitoringConfig.jmxImage: "ghcr.io/banzaicloud/jmx-javaagent:0.15.0"
+    KafkaCluster.kafka.spec.monitoringConfig.pathToJar: "/opt/jmx_exporter/jmx_prometheus_javaagent-0.15.0.jar"
+  namespace: kafka
+  sha256:
+  version: v0.17.0
+  pre_install:
+  - apps:
+    - cert-manager
+    - zookeeper-operator
+    - kube-prometheus-stack
+    - kafka-operator
+  - steps: 
+    # Create a Zookeeper cluster
+    - |
+      kubectl apply --namespace zookeeper -f - <<EOF
+      apiVersion: zookeeper.pravega.io/v1beta1
+      kind: ZookeeperCluster
+      metadata:
+          name: zookeeper
+          namespace: zookeeper
+      spec:
+          replicas: 3
+      EOF
+    # Wait for Zookeeper cluster to be ready
+    - |
+      echo "Waiting for zookeeper cluster to be ready"
+      while true;
+      do
+        replicas=$(kubectl get ZookeeperCluster -n zookeeper zookeeper -o jsonpath='{.status.replicas}')
+        readyReplicas=$(kubectl get ZookeeperCluster -n zookeeper zookeeper -o jsonpath='{.status.readyReplicas}')
+        if [ ! -z "${replicas}" ] && [ "${replicas}" = "${readyReplicas}" ]; then break; fi
+      done
+  post_install:
+  - steps:
+    # Create the prometheus ServiceMonitors.
+    - kubectl apply -n kafka -f https://raw.githubusercontent.com/banzaicloud/kafka-operator/v0.17.0/config/samples/kafkacluster-prometheus.yaml
+  - steps:
+    # Wait for kafkacluster to be ready
+    - |
+      echo "Waiting for kafka cluster to be ready"
+      while true;
+      do
+        cluster_state=$(kubectl get kafkacluster kafka -n kafka -o jsonpath='{.status.state}')
+        if [ ! -z "${cluster_state}" ] && [ "${cluster_state}" = "ClusterRunning" ]; then break; fi
+      done
+  pre_cleanup:
+    steps:
+    # Cleanup CRs
+    - kubectl delete -n kafka -f https://raw.githubusercontent.com/banzaicloud/kafka-operator/v0.17.0/config/samples/kafkacluster-prometheus.yaml
+    - kubectl delete -n zookeeper ZookeeperCluster zookeeper
+  post_cleanup:
+    steps:
+    - kubectl delete namespace zookeeper
+    - kubectl delete namespace kafka

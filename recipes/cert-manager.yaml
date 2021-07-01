@@ -2,13 +2,15 @@ apiVersion: v1
 kind: kbrew
 app:
   repository:
-    name: cert-manager
-    url: https://github.com/jetstack/cert-manager/releases/download/v0.10.1/cert-manager.yaml
-    type: raw
-  name: cert-manager
-  namespace: "-"
+    name: jetstack
+    url: https://charts.jetstack.io
+    type: helm
+  namespace: cert-manager
   sha256:
-  version: v0.10.1
+  version: v1.3.1
   pre_install:
   - steps:
-    - kubectl apply -f https://raw.githubusercontent.com/jetstack/cert-manager/v0.10.1/deploy/manifests/01-namespace.yaml
+    - kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.3.1/cert-manager.crds.yaml
+  post_cleanup:
+  steps:
+  - kubectl delete -f https://github.com/jetstack/cert-manager/releases/download/v1.3.1/cert-manager.crds.yaml
