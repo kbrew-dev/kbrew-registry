@@ -1,6 +1,8 @@
 # MinIO tenant
 # Description: minio-tenant creates MinIO operator and a minio tenant
 # https://github.com/minio/operator/tree/master/helm/minio-operator
+# Tested On:
+# - GKE v1.19.10-gke.1700
 apiVersion: v1
 kind: kbrew
 app:
@@ -18,19 +20,16 @@ app:
       fi
   - apps:
     - minio-operator
-  # TODO: Remove once https://github.com/kbrew-dev/kbrew/issues/80 is addressed
-  - steps:
-    - kubectl create namespace minio-tenant
   repository:
     name: minio
-    url: https://raw.githubusercontent.com/minio/operator/v4.1.0/examples/tenant-lite.yaml
+    url: https://raw.githubusercontent.com/minio/operator/v4.1.2/examples/tenant-lite.yaml
     type: raw
   args:
     Tenant.minio.spec.pools[0].volumeClaimTemplate.spec.storageClassName: '{{ $storageClass := "default" }}{{ range $index, $sc := (lookup "storage.k8s.io/v1" "StorageClass" "" "").items }}{{ if eq $sc.volumeBindingMode "WaitForFirstConsumer"}}{{ $storageClass = $sc.metadata.name }}{{ end }}{{ end }}{{ $storageClass }}'
-    Tenant.minio.spec.pools[0].volumeClaimTemplate.spec.resources.requests.storage: 10Gi
+    Tenant.minio.spec.pools[0].volumeClaimTemplate.spec.resources.requests.storage: 1Gi
   namespace: "minio-tenant"
   sha256:
-  version: 4.1.0
+  version: 4.1.2
   post_install:
   - steps:
     - |
@@ -51,4 +50,6 @@ app:
       echo "Port forward with following command to access minio-tenant console - 'kubectl port-forward svc/minio-console -n minio-tenant 9443:9443'"
       echo "Console ACCESS_KEY: $(kubectl get secret -n minio-tenant console-secret -o jsonpath='{.data.CONSOLE_ACCESS_KEY}' | base64 -d)"
       echo "Console SECRET_KEY: $(kubectl get secret -n minio-tenant console-secret -o jsonpath='{.data.CONSOLE_SECRET_KEY}' | base64 -d)"
-
+  post_cleanup:
+    step:
+    - kubectl delete namespace minio-tenant
