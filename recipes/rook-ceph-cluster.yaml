@@ -1,0 +1,47 @@
+# https://github.com/rook/rook/tree/v1.5.8/cluster
+# Tested On:
+# - GKE v1.19.10-gke.1700
+apiVersion: v1
+kind: kbrew
+app:
+  repository:
+    name: rook-ceph-cluster
+    url: https://raw.githubusercontent.com/rook/rook/v1.5.8/cluster/examples/kubernetes/ceph/cluster-on-pvc.yaml
+    type: raw
+  args:
+    # Find and set default storageClass
+    CephCluster.rook-ceph.spec.mon.volumeClaimTemplate.spec.storageClassName: '{{ $storageClass := "default" }}{{ range $index, $sc := (lookup "storage.k8s.io/v1" "StorageClass" "" "").items }}{{ $isDefault := index $sc.metadata.annotations "storageclass.kubernetes.io/is-default-class" }}{{ if eq (default "false" $isDefault ) "true" }}{{ $storageClass = $sc.metadata.name }}{{ end }}{{ end }}{{ $storageClass }}'
+    CephCluster.rook-ceph.spec.storage.storageClassDeviceSets[0].volumeClaimTemplates[0].spec.storageClassName: '{{ $storageClass := "default" }}{{ range $index, $sc := (lookup "storage.k8s.io/v1" "StorageClass" "" "").items }}{{ $isDefault := index $sc.metadata.annotations "storageclass.kubernetes.io/is-default-class" }}{{ if eq (default "false" $isDefault ) "true" }}{{ $storageClass = $sc.metadata.name }}{{ end }}{{ end }}{{ $storageClass }}'
+  namespace: rook-ceph
+  sha256:
+  version: v1.5.8
+  pre_install:
+  - apps:
+    - rook-ceph-operator
+  post_install:
+  # Wait for cluster to be ready
+  - steps:
+    # Verify if the ceph cluster is ready
+    - |
+      echo "Waiting for ceph cluster to be ready"
+      while true;
+      do
+        phase=$(kubectl get cephcluster -n rook-ceph rook-ceph -o jsonpath='{.status.phase}')
+        if [ ! -z "${phase}" ] && [ "${phase}" = "Ready" ]; then break; fi
+      done
+  # Create storageclass and volumesnapshotclass to support volumesnapshots
+  - steps:
+    - |
+      # Create VolumeSnapshot CRDs if not exists
+      # TODO: Skip creation if CRDs already exists
+      kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/release-4.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+      kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/release-4.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
+      kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/release-4.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
+
+    - kubectl apply -f https://raw.githubusercontent.com/rook/rook/v1.5.8/cluster/examples/kubernetes/ceph/csi/rbd/storageclass.yaml
+    - kubectl apply -f https://raw.githubusercontent.com/rook/rook/v1.5.8/cluster/examples/kubernetes/ceph/csi/rbd/snapshotclass.yaml
+  pre_cleanup:
+    steps:
+    # Delete storageclass and snapshotclass
+    - kubectl delete -f https://raw.githubusercontent.com/rook/rook/v1.5.8/cluster/examples/kubernetes/ceph/csi/rbd/storageclass.yaml
+    - kubectl delete -f https://raw.githubusercontent.com/rook/rook/v1.5.8/cluster/examples/kubernetes/ceph/csi/rbd/snapshotclass.yaml
