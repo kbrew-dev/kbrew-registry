@@ -1,3 +1,9 @@
+# ingress-nginx
+# Description: Detects Kubernetes provider type and install ingress-nginx controller
+# Tested on:
+# - EKS eks.5
+# - GKE 1.19.9-gke.1900
+# - Digital Ocean 1.21.2-do.2
 apiVersion: v1
 kind: kbrew
 app:

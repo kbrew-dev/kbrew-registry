@@ -1,3 +1,9 @@
+# Longhorn recipe
+# Description: Installs iscsi daemonset, longhorn and ingress-nginx
+# Tested on:
+# - EKS eks.5
+# - GKE 1.19.9-gke.1900
+# - Digital Ocean 1.21.2-do.2
 apiVersion: v1
 kind: kbrew
 app:
@@ -18,8 +24,8 @@ app:
   - apps:
     - ingress-nginx
   - steps:
-    - echo ${USERNAME}:$(echo ${PASSWORD} | openssl passwd -stdin -apr1) >> auth
-    - kubectl -n longhorn-system create secret generic basic-auth --from-file=auth
+    - echo ${USERNAME}:$(echo ${PASSWORD} | openssl passwd -stdin -apr1) >> /tmp/auth
+    - kubectl -n longhorn-system create secret generic basic-auth --from-file=/tmp/auth
     - |
       echo "
       apiVersion: networking.k8s.io/v1
@@ -48,6 +54,13 @@ app:
                   port:
                     number: 80
       " | kubectl -n longhorn-system create -f -
+    # post installation checks
+    - kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn/master/examples/simple_pvc.yaml
+    - kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn/master/examples/simple_pod.yaml
+  pre_cleanup:
+    steps:
+      - kubectl delete -f https://raw.githubusercontent.com/longhorn/longhorn/master/examples/simple_pod.yaml
+      - kubectl delete -f https://raw.githubusercontent.com/longhorn/longhorn/master/examples/simple_pvc.yaml
   post_cleanup:
     steps:
       - kubectl delete secret basic-auth -n longhorn-system
