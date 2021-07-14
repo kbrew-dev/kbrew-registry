@@ -19,3 +19,6 @@ app:
     type: helm
   namespace: ingress-nginx
   version: 3.34.0
+  post_cleanup:
+    steps:
+      - kubectl delete namespace ingress-nginx

@@ -24,8 +24,7 @@ app:
   - apps:
     - ingress-nginx
   - steps:
-    - echo ${USERNAME}:$(echo ${PASSWORD} | openssl passwd -stdin -apr1) >> /tmp/auth
-    - kubectl -n longhorn-system create secret generic basic-auth --from-file=/tmp/auth
+    - kubectl -n longhorn-system create secret generic basic-auth --from-literal=auth=$(echo ${USERNAME}:$(echo ${PASSWORD} | openssl passwd -stdin -apr1))
     - |
       echo "
       apiVersion: networking.k8s.io/v1
@@ -66,4 +65,4 @@ app:
       - kubectl delete secret basic-auth -n longhorn-system
       - kubectl delete -f https://raw.githubusercontent.com/longhorn/longhorn-manager/master/deploy/prerequisite/longhorn-iscsi-installation.yaml
       - kubectl delete ingress longhorn-ingress -n longhorn-system
-      - kubectl delete ns longhorn-system ingress-nginx
+      - kubectl delete ns longhorn-system
