@@ -1,0 +1,24 @@
+# ingress-nginx
+# Description: Detects Kubernetes provider type and install ingress-nginx controller
+# Tested on:
+# - EKS eks.5
+# - GKE 1.19.9-gke.1900
+# - Digital Ocean 1.21.2-do.2
+apiVersion: v1
+kind: kbrew
+app:
+  args:
+    # annotation for EKS
+    controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type": '{{ $providerID := (index (lookup "v1" "Node" "" "").items 0).spec.providerID }}{{ if hasPrefix "aws" $providerID }}nlb{{end}}'
+    # annotations for Digital Ocean
+    controller.service.annotations."service\.beta\.kubernetes\.io/do-loadbalancer-enable-proxy-protocol": '{{ $providerID := (index (lookup "v1" "Node" "" "").items 0).spec.providerID }}{{ if hasPrefix "digitalocean" $providerID }}true{{end}}'
+    controller.config."use-proxy-protocol": '{{ $providerID := (index (lookup "v1" "Node" "" "").items 0).spec.providerID }}{{ if hasPrefix "digitalocean" $providerID }}true{{end}}'
+  repository:
+    name: ingress-nginx
+    url: https://kubernetes.github.io/ingress-nginx
+    type: helm
+  namespace: ingress-nginx
+  version: 3.34.0
+  post_cleanup:
+    steps:
+      - kubectl delete namespace ingress-nginx

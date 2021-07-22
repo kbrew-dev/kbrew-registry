@@ -1,0 +1,68 @@
+# Longhorn recipe
+# Description: Installs iscsi daemonset, longhorn and ingress-nginx
+# Tested on:
+# - EKS eks.5
+# - GKE 1.19.9-gke.1900
+# - Digital Ocean 1.21.2-do.2
+apiVersion: v1
+kind: kbrew
+app:
+  repository:
+    name: longhorn
+    url: https://charts.longhorn.io
+    type: helm
+  namespace: "longhorn-system"
+  pre_install:
+  - steps:
+    - openssl version
+      # Recipe needs USER and PASSWORD environment variables for ingress basic auth
+    - ': "${USERNAME:?Variable USERNAME not set or empty}" : "${PASSWORD:?Variable PASSWORD not set or empty}"'
+    - curl -s https://raw.githubusercontent.com/longhorn/longhorn/v1.1.1/scripts/environment_check.sh | bash
+      # daemonset for iscsi service installation
+    - kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn-manager/master/deploy/prerequisite/longhorn-iscsi-installation.yaml
+  post_install:
+  - apps:
+    - ingress-nginx
+  - steps:
+    - kubectl -n longhorn-system create secret generic basic-auth --from-literal=auth=$(echo ${USERNAME}:$(echo ${PASSWORD} | openssl passwd -stdin -apr1))
+    - |
+      echo "
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: longhorn-ingress
+        namespace: longhorn-system
+        annotations:
+          # type of authentication
+          nginx.ingress.kubernetes.io/auth-type: basic
+          # prevent the controller from redirecting (308) to HTTPS
+          nginx.ingress.kubernetes.io/ssl-redirect: 'false'
+          # name of the secret that contains the user/password definitions
+          nginx.ingress.kubernetes.io/auth-secret: basic-auth
+          # message to display with an appropriate context why the authentication is required
+          nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required '
+      spec:
+        rules:
+        - http:
+            paths:
+            - path: /
+              pathType: Prefix
+              backend:
+                service:
+                  name: longhorn-frontend
+                  port:
+                    number: 80
+      " | kubectl -n longhorn-system create -f -
+    # post installation checks
+    - kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn/master/examples/simple_pvc.yaml
+    - kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn/master/examples/simple_pod.yaml
+  pre_cleanup:
+    steps:
+      - kubectl delete -f https://raw.githubusercontent.com/longhorn/longhorn/master/examples/simple_pod.yaml
+      - kubectl delete -f https://raw.githubusercontent.com/longhorn/longhorn/master/examples/simple_pvc.yaml
+  post_cleanup:
+    steps:
+      - kubectl delete secret basic-auth -n longhorn-system
+      - kubectl delete -f https://raw.githubusercontent.com/longhorn/longhorn-manager/master/deploy/prerequisite/longhorn-iscsi-installation.yaml
+      - kubectl delete ingress longhorn-ingress -n longhorn-system
+      - kubectl delete ns longhorn-system
