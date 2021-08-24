@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: kbrew
+app:
+  args:
+    functionNamespace: openfaas-fn
+    generateBasicAuth: true
+  repository:
+    name: openfaas
+    url: https://openfaas.github.io/faas-netes/
+    type: helm
+  namespace: "openfaas"
+  sha256:
+  version: 8.0.2
+  pre_install:
+  - steps:
+    - kubectl apply -f https://raw.githubusercontent.com/openfaas/faas-netes/master/namespaces.yml
+  post_cleanup:
+    steps:
+    - kubectl delete ns openfaas-fn
+    - kubectl delete ns openfaas
