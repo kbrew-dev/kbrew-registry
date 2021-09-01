@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: kbrew
+app:
+  args:
+    replicas: 1
+  repository:
+    name: elastic
+    url: https://helm.elastic.co
+    type: helm
+  namespace: ""
+  sha256:
+  version: 7.13.0
+  post_install:
+  - apps:
+    - kibana
+    - logstash

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: kbrew
+app:
+  repository:
+    name: elastic
+    url: https://helm.elastic.co
+    type: helm
+  namespace: "elastic-system"
+  sha256:
+  version: 1.6.0
