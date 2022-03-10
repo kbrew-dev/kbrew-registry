@@ -1,0 +1,38 @@
+# https://docs.cilium.io/en/stable/gettingstarted/k8s-install-helm/
+# Prerequisites:
+# - Linux kernel >= 4.9.17
+# - Kubernetes must be configured to use CNI
+apiVersion: v1
+kind: kbrew
+app:
+  pre_install:
+  - steps: 
+    - |
+      if [ "$EUID" -ne 0 ]
+      then
+        echo "Please run as root"
+        exit 1
+      fi
+  repository:
+    name: cilium
+    url: https://helm.cilium.io/
+    type: helm
+  namespace: "kube-system"
+  sha256:
+  version: 1.11.2
+
+  post_install:
+  - steps:
+    #check if cilium cli already installed
+    - |
+      if [ ! -f "/usr/local/bin/cilium" ]; then
+        curl -sL --remote-name-all https://github.com/cilium/cilium-cli/releases/latest/download/cilium-linux-amd64.tar.gz{,.sha256sum}
+        sha256sum --check cilium-linux-amd64.tar.gz.sha256sum
+        tar xzvfC cilium-linux-amd64.tar.gz /usr/local/bin
+        rm cilium-linux-amd64.tar.gz{,.sha256sum}
+      fi
+    # check cilium status
+    - cilium status --wait
+  post_cleanup:
+    steps:
+    - rm -f /usr/local/bin/cilium
