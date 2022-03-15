@@ -1,0 +1,17 @@
+# https://github.com/haproxy-ingress/charts
+# https://haproxy-ingress.github.io/docs/getting-started/
+apiVersion: v1
+kind: kbrew
+app:
+  repository:
+    name: haproxy-ingress
+    url: https://haproxy-ingress.github.io/charts
+    type: helm
+  args:
+    controller.hostNetwork: 'true'
+  namespace: ingress-controller
+  sha256:
+  version: 0.13.6
+  post_cleanup:
+    steps:
+      - kubectl delete namespace ingress-controller
